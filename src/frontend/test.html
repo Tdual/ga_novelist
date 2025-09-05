@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GA小説変換テスト</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .text-display {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            min-height: 300px;
+            line-height: 1.8;
+            font-size: 1.05rem;
+            color: #2c3e50;
+            white-space: pre-wrap;
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            margin-bottom: 30px;
+        }
+
+        .controls h2 {
+            color: #333;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+        }
+
+        .operator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .operator-btn {
+            background: white;
+            border: 2px solid #e0e0e0;
+            color: #333;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .operator-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .operator-btn:active {
+            transform: translateY(0);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .reset-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .reset-btn:hover {
+            background: #ff3838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
+        }
+
+        .info-panel {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .history {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 30px;
+        }
+
+        .history h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .history-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-left: 3px solid #667eea;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .history-operator {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .genre-weights {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .weight-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧬 遺伝的アルゴリズム小説変換テスト</h1>
+            <p class="subtitle">ボタンをクリックして文章がどのように進化するか確認できます</p>
+        </header>
+
+        <div class="main-card">
+            <div class="text-display" id="textDisplay">
+                読み込み中...
+            </div>
+
+            <div class="controls">
+                <h2>変換オペレーター</h2>
+                <div class="operator-grid">
+                    <button class="operator-btn" onclick="mutate('もっとホラー')">🎃 もっとホラー</button>
+                    <button class="operator-btn" onclick="mutate('もっとロマンス')">💕 もっとロマンス</button>
+                    <button class="operator-btn" onclick="mutate('もっとSF')">🚀 もっとSF</button>
+                    <button class="operator-btn" onclick="mutate('もっとコメディ')">😂 もっとコメディ</button>
+                    <button class="operator-btn" onclick="mutate('もっと詩的に')">🌸 もっと詩的に</button>
+                    <button class="operator-btn" onclick="mutate('もっとスピード感')">⚡ もっとスピード感</button>
+                    <button class="operator-btn" onclick="mutate('もっとセリフを')">💬 もっとセリフを</button>
+                    <button class="operator-btn" onclick="mutate('もっとキャラを増やす')">👥 もっとキャラを増やす</button>
+                    <button class="operator-btn" onclick="mutate('もっと舞台を変える')">🏙️ もっと舞台を変える</button>
+                    <button class="operator-btn" onclick="mutate('もっと混沌')">🌀 もっと混沌</button>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="reset-btn" onclick="resetText()">🔄 初期状態に戻す</button>
+                </div>
+            </div>
+
+            <div class="info-panel">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">最後の操作</div>
+                        <div class="info-value" id="lastOperation">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">変換回数</div>
+                        <div class="info-value" id="mutationCount">0</div>
+                    </div>
+                </div>
+                <div class="genre-weights" id="genreWeights"></div>
+            </div>
+        </div>
+
+        <div class="history">
+            <h2>変換履歴</h2>
+            <div id="historyList">
+                <p style="color: #999;">まだ変換されていません</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">処理中...</div>
+
+    <script>
+        const API_BASE = 'http://localhost:8081/api/test';
+        let mutationCount = 0;
+
+        // 初期テキストを読み込む
+        async function loadInitialText() {
+            try {
+                const response = await fetch(`${API_BASE}/initial`);
+                const data = await response.json();
+                document.getElementById('textDisplay').innerText = data.text;
+                updateGenreWeights(data.genome);
+            } catch (error) {
+                console.error('Error loading initial text:', error);
+                document.getElementById('textDisplay').innerText = 'エラー: サーバーに接続できません';
+            }
+        }
+
+        // 変換を適用
+        async function mutate(operator) {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE}/mutate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ operator })
+                });
+
+                const data = await response.json();
+                document.getElementById('textDisplay').innerText = data.text;
+                document.getElementById('lastOperation').innerText = operator;
+                mutationCount++;
+                document.getElementById('mutationCount').innerText = mutationCount;
+                updateGenreWeights(data.genome);
+                await loadHistory();
+            } catch (error) {
+                console.error('Error applying mutation:', error);
+                alert('エラーが発生しました');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // リセット
+        async function resetText() {
+            if (!confirm('初期状態に戻しますか？')) return;
+            
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE}/reset`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                document.getElementById('textDisplay').innerText = data.text;
+                document.getElementById('lastOperation').innerText = '-';
+                mutationCount = 0;
+                document.getElementById('mutationCount').innerText = '0';
+                document.getElementById('historyList').innerHTML = '<p style="color: #999;">まだ変換されていません</p>';
+                await loadInitialText();
+            } catch (error) {
+                console.error('Error resetting:', error);
+                alert('エラーが発生しました');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 履歴を読み込む
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/history`);
+                const data = await response.json();
+                
+                if (data.history && data.history.length > 0) {
+                    const historyHtml = data.history.slice(-5).reverse().map(item => `
+                        <div class="history-item">
+                            <span class="history-operator">${item.operator}</span>
+                        </div>
+                    `).join('');
+                    document.getElementById('historyList').innerHTML = historyHtml;
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // ジャンルウェイトを更新
+        function updateGenreWeights(genome) {
+            if (!genome || !genome.genre_weights) return;
+            
+            const weights = Object.entries(genome.genre_weights)
+                .filter(([_, value]) => value > 0.2)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([key, value]) => `
+                    <span class="weight-badge">${key}: ${(value * 100).toFixed(0)}%</span>
+                `).join('');
+            
+            document.getElementById('genreWeights').innerHTML = weights || '';
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // ページ読み込み時に初期テキストを表示
+        window.addEventListener('DOMContentLoaded', () => {
+            loadInitialText();
+        });
+    </script>
+</body>
+</html>
