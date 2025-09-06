@@ -259,21 +259,27 @@ function mutate_poetic(genome::TextGenome)
     new_genome.mutation_count += 1
     
     mutation_strength = new_genome.style_params["poetic_level"]
-    
-    # 詩的な表現に置換
-    poetic_replacements = [
-        ("森", "緑の聖域"),
-        ("光", "希望の灯火"),
-        ("歩いていた", "歩みを進めていた"),
-        ("キラキラ", "星屑のように煌めいて")
-    ]
+    corpus = initialize_corpus()
     
     for i in 1:length(new_genome.text_segments)
         segment = new_genome.text_segments[i]
         
-        for (original, replacement) in poetic_replacements
-            if rand() < mutation_strength * 0.3 && contains(segment, original)
-                segment = replace(segment, original => replacement, count=1)
+        # コーパスの詩的文体変換を適用
+        if rand() < mutation_strength * 0.3
+            segment = apply_style(segment, corpus, "poetic")
+        end
+        
+        # コーパスからランダムな詩的フレーズを挿入
+        if rand() < mutation_strength * 0.2
+            # neutralやromanceジャンルから美しい形容を取得
+            beautiful_words = []
+            if haskey(corpus.word_slots["romance"], "形容")
+                append!(beautiful_words, corpus.word_slots["romance"]["形容"])
+            end
+            if !isempty(beautiful_words)
+                beautiful_word = rand(beautiful_words)
+                # 文の途中に挿入
+                segment = beautiful_word * segment
             end
         end
         
@@ -289,15 +295,23 @@ function mutate_speed(genome::TextGenome)
     new_genome.style_params["pace"] = min(1.0, genome.style_params["pace"] + 0.3)
     new_genome.mutation_count += 1
     
+    corpus = initialize_corpus()
+    pace_level = new_genome.style_params["pace"]
+    
     for i in 1:length(new_genome.text_segments)
         segment = new_genome.text_segments[i]
+        
+        # コーパスのカジュアルスタイルを適用してスピード感を出す
+        if rand() < pace_level * 0.4
+            segment = apply_style(segment, corpus, "casual")
+        end
         
         # 長い文を短くする
         sentences = split(segment, "。")
         shortened = String[]
         
         for sentence in sentences
-            if length(sentence) > 40 && rand() < 0.5
+            if length(sentence) > 40 && rand() < pace_level * 0.6
                 # 文を短縮
                 words = split(sentence)
                 if length(words) > 8
@@ -310,7 +324,20 @@ function mutate_speed(genome::TextGenome)
             end
         end
         
-        new_genome.text_segments[i] = join(shortened, "。")
+        # コーパスから速い動作の単語に置換
+        segment = join(shortened, "。")
+        if haskey(corpus.word_slots["neutral"], "動作")
+            fast_actions = ["駆ける", "急ぐ", "飛び出す", "駆け抜ける"]
+            slow_actions = ["歩く", "進む", "立ち止まる"]
+            
+            for (slow, fast) in zip(slow_actions, fast_actions[1:min(length(slow_actions), length(fast_actions))])
+                if rand() < pace_level * 0.3 && contains(segment, slow)
+                    segment = replace(segment, slow => fast, count=1)
+                end
+            end
+        end
+        
+        new_genome.text_segments[i] = segment
     end
     
     return new_genome
@@ -322,18 +349,33 @@ function mutate_dialogue(genome::TextGenome)
     new_genome.style_params["dialogue_ratio"] = min(1.0, genome.style_params["dialogue_ratio"] + 0.3)
     new_genome.mutation_count += 1
     
-    dialogues = [
-        "「これは一体...」",
-        "「信じられない」",
-        "「どうしよう」",
-        "「まさか」",
-        "「すごい...」"
-    ]
+    corpus = initialize_corpus()
+    dialogue_ratio = new_genome.style_params["dialogue_ratio"]
     
     for i in 1:length(new_genome.text_segments)
-        # 30%の確率でセリフを追加
-        if rand() < 0.3
-            dialogue = rand(dialogues)
+        # セリフを追加する確率はdialogue_ratioに基づく
+        if rand() < dialogue_ratio * 0.4
+            # コーパスから感情に基づいたセリフを生成
+            dialogue_templates = [
+                "「{感情}...」",
+                "「これは{感情}だ」",
+                "「まさか、{感情}」",
+                "「{感情}になるなんて」"
+            ]
+            
+            # 現在の設定要素から感情を推定
+            emotion_genres = ["neutral", "horror", "romance", "scifi", "comedy"]
+            selected_genre = rand(emotion_genres)
+            
+            template = rand(dialogue_templates)
+            dialogue = fill_template(template, corpus, selected_genre)
+            
+            # セリフが空の場合はデフォルトを使用
+            if isempty(strip(dialogue))
+                default_dialogues = ["「これは...」", "「どうしよう」", "「すごい」"]
+                dialogue = rand(default_dialogues)
+            end
+            
             new_genome.text_segments[i] = new_genome.text_segments[i] * "\n" * dialogue
         end
     end
@@ -346,18 +388,40 @@ function mutate_characters(genome::TextGenome)
     new_genome = deepcopy(genome)
     new_genome.mutation_count += 1
     
-    # 新キャラクターを導入
-    new_characters = ["ミク", "タクヤ", "サクラ"]
-    new_char = rand(new_characters)
+    corpus = initialize_corpus()
     
-    # 最後の段落に新キャラを登場させる
-    if length(new_genome.text_segments) > 0
-        last_segment = new_genome.text_segments[end]
-        intro = "\n「待って！」$(new_char)の声が聞こえた。"
-        new_genome.text_segments[end] = last_segment * intro
+    # コーパスから各ジャンルの主体（キャラクター）を取得
+    all_characters = []
+    for (genre, slots) in corpus.word_slots
+        if haskey(slots, "主体")
+            append!(all_characters, slots["主体"])
+        end
     end
     
-    push!(new_genome.character_traits, new_char)
+    # ユニークなキャラクターのみを残す
+    unique_characters = unique(all_characters)
+    
+    if !isempty(unique_characters)
+        new_char = rand(unique_characters)
+        
+        # 最後の段落に新キャラを登場させる
+        if length(new_genome.text_segments) > 0
+            last_segment = new_genome.text_segments[end]
+            
+            # コーパスからセリフテンプレートを生成
+            intro_templates = [
+                "\n「待って！」$(new_char)の声が聞こえた。",
+                "\nそこに$(new_char)が現れた。",
+                "\n突然、$(new_char)がやって来た。",
+                "\n「こんにちは」$(new_char)が挨拶した。"
+            ]
+            
+            intro = rand(intro_templates)
+            new_genome.text_segments[end] = last_segment * intro
+        end
+        
+        push!(new_genome.character_traits, new_char)
+    end
     
     return new_genome
 end
@@ -409,7 +473,7 @@ function mutate_setting(genome::TextGenome)
     return final_genome
 end
 
-# 舞台の進化を適用
+# 舞台の進化を適用（コーパス統合版）
 function apply_stage_evolution(genome::TextGenome)
     new_genome = deepcopy(genome)
     
@@ -420,6 +484,7 @@ function apply_stage_evolution(genome::TextGenome)
         if haskey(STAGE_EVOLUTION, stage) && rand() < 0.4
             evolution = STAGE_EVOLUTION[stage]
             new_stage = rand(evolution.transitions)
+            target_genre = atmosphere_to_genre(evolution.atmosphere)
             
             # テキスト内で舞台を進化
             for i in 1:length(new_genome.text_segments)
@@ -427,17 +492,16 @@ function apply_stage_evolution(genome::TextGenome)
                 if contains(segment, stage)
                     # 進化した舞台に置換
                     segment = replace(segment, stage => new_stage, count=1)
-                    # 雰囲気に応じた修飾を追加
+                    
+                    # コーパスを使った雰囲気修飾
                     if haskey(STAGE_EVOLUTION, new_stage)
                         new_evolution = STAGE_EVOLUTION[new_stage]
-                        if new_evolution.atmosphere == "恐怖"
-                            segment = add_horror_atmosphere(segment)
-                        elseif new_evolution.atmosphere == "幻想"
-                            segment = add_fantasy_atmosphere(segment)
-                        elseif new_evolution.atmosphere == "SF"
-                            segment = add_scifi_atmosphere(segment)
-                        end
+                        segment = add_corpus_atmosphere(segment, new_evolution.atmosphere, GLOBAL_CORPUS)
+                        
+                        # コーパスの語彙で舞台要素を置換
+                        segment = enhance_with_corpus_vocabulary(segment, target_genre, GLOBAL_CORPUS)
                     end
+                    
                     new_genome.text_segments[i] = segment
                 end
             end
@@ -537,29 +601,113 @@ function apply_stage_crossover_mutation(selected::TextGenome, original::TextGeno
     return result
 end
 
-# 雰囲気修飾の追加関数
+# コーパス統合のヘルパー関数
+
+# 雰囲気をジャンルにマッピング
+function atmosphere_to_genre(atmosphere::String)
+    mapping = Dict(
+        "恐怖" => "horror",
+        "幻想" => "romance", # ファンタジー要素
+        "SF" => "scifi",
+        "機械的" => "scifi",
+        "静寂" => "neutral",
+        "荒廃" => "horror",
+        "神秘" => "romance",
+        "重厚" => "neutral"
+    )
+    return get(mapping, atmosphere, "neutral")
+end
+
+# コーパスを使った雰囲気修飾
+function add_corpus_atmosphere(text::String, atmosphere::String, corpus::TextCorpus)
+    genre = atmosphere_to_genre(atmosphere)
+    
+    # コーパスの雰囲気修飾語を使用
+    if haskey(corpus.word_slots, genre) && haskey(corpus.word_slots[genre], "雰囲気")
+        modifiers = corpus.word_slots[genre]["雰囲気"]
+        if !isempty(modifiers)
+            modifier = rand(modifiers)
+            return modifier * text
+        end
+    end
+    
+    # フォールバック（コーパスが無い場合は元の実装）
+    return add_legacy_atmosphere(text, atmosphere)
+end
+
+# 元の雰囲気修飾（フォールバック用）
+function add_legacy_atmosphere(text::String, atmosphere::String)
+    if atmosphere == "恐怖"
+        horror_modifiers = ["不気味な", "薄暗い", "ざわめく", "冷たい風が吹く"]
+        modifier = rand(horror_modifiers)
+        return modifier * text
+    elseif atmosphere == "幻想"
+        fantasy_modifiers = ["輝く", "神秘的な", "魔法に満ちた", "幻想的な"]
+        modifier = rand(fantasy_modifiers)
+        return modifier * text
+    elseif atmosphere == "SF"
+        scifi_modifiers = ["メタリックな", "電子的な", "未来的な", "人工的な"]
+        modifier = rand(scifi_modifiers)
+        return modifier * text
+    end
+    return text
+end
+
+# コーパスの語彙で舞台要素を強化
+function enhance_with_corpus_vocabulary(text::String, genre::String, corpus::TextCorpus)
+    if !haskey(corpus.word_slots, genre)
+        return text
+    end
+    
+    enhanced_text = text
+    word_categories = corpus.word_slots[genre]
+    
+    # 場所の語彙を置換
+    if haskey(word_categories, "場所") && rand() < 0.3
+        places = word_categories["場所"]
+        if !isempty(places)
+            new_place = rand(places)
+            # 一般的な場所名詞を置換
+            for common_place in ["場所", "地", "所", "エリア"]
+                if contains(enhanced_text, common_place)
+                    enhanced_text = replace(enhanced_text, common_place => new_place, count=1)
+                    break
+                end
+            end
+        end
+    end
+    
+    # フレーズパターンを追加
+    if haskey(corpus.phrase_patterns, genre) && rand() < 0.2
+        phrases = corpus.phrase_patterns[genre]
+        if !isempty(phrases)
+            phrase = rand(phrases)
+            enhanced_text = phrase * enhanced_text
+        end
+    end
+    
+    return enhanced_text
+end
+
+# 既存の関数も残しておく（後方互換性のため）
 function add_horror_atmosphere(text::String)
-    horror_modifiers = ["不気味な", "薄暗い", "ざわめく", "冷たい風が吹く"]
-    modifier = rand(horror_modifiers)
-    return modifier * text
+    return add_legacy_atmosphere(text, "恐怖")
 end
 
 function add_fantasy_atmosphere(text::String)
-    fantasy_modifiers = ["輝く", "神秘的な", "魔法に満ちた", "幻想的な"]
-    modifier = rand(fantasy_modifiers)
-    return modifier * text
+    return add_legacy_atmosphere(text, "幻想")
 end
 
 function add_scifi_atmosphere(text::String)
-    scifi_modifiers = ["メタリックな", "電子的な", "未来的な", "人工的な"]
-    modifier = rand(scifi_modifiers)
-    return modifier * text
+    return add_legacy_atmosphere(text, "SF")
 end
 
 # 混沌変換
 function mutate_chaos(genome::TextGenome)
     new_genome = deepcopy(genome)
     new_genome.mutation_count += 1
+    
+    corpus = initialize_corpus()
     
     # ランダムな変更を少しずつ適用
     for i in 1:length(new_genome.text_segments)
@@ -570,15 +718,20 @@ function mutate_chaos(genome::TextGenome)
             segment = replace(segment, "。" => "！", count=1)
         end
         
-        # ランダムな単語を挿入
-        if rand() < 0.2
-            chaos_words = ["突然", "なぜか", "まさかの", "謎の"]
-            word = rand(chaos_words)
+        # コーパスからコメディジャンルのフレーズを挿入
+        if rand() < 0.25 && haskey(corpus.phrase_patterns, "comedy")
+            chaos_phrase = rand(corpus.phrase_patterns["comedy"])
             sentences = split(segment, "。")
             if length(sentences) > 0
-                sentences[1] = word * sentences[1]
+                sentences[1] = chaos_phrase * sentences[1]
                 segment = join(sentences, "。")
             end
+        end
+        
+        # コーパスからランダムなジャンルの効果音を追加（コメディ系）
+        if rand() < 0.15 && haskey(corpus.word_slots["comedy"], "効果音")
+            sound_effect = rand(corpus.word_slots["comedy"]["効果音"])
+            segment = segment * sound_effect
         end
         
         new_genome.text_segments[i] = segment
