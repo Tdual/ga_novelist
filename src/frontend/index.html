@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GA Novelist - 4ルーム並行進化</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
     <style>
         * {
             margin: 0;
@@ -214,7 +215,17 @@
 <body>
     <div class="header">
         <h1>🧬 GA Novelist</h1>
-        <p>4つの並行進化する小説世界へようこそ</p>
+        <p style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <img src="https://raw.githubusercontent.com/JuliaLang/julia-logo-graphics/master/images/julia-logo-color.svg" 
+                 alt="Julia" 
+                 style="height: 32px; width: auto; object-fit: contain;">
+            <span>で書かれた遺伝的アルゴリズム小説システム</span>
+            <span style="font-size: 20px; margin-left: 5px;">📖</span>
+        </p>
+        <p style="font-size: 14px; margin-top: 8px; color: #888;">みなさんの選択で物語が進化する - 4つの並行進化する小説世界</p>
+        <p style="font-size: 12px; margin-top: 5px; color: #aaa;">
+            作成者: <a href="https://x.com/tdualdir" target="_blank" style="color: #1DA1F2; text-decoration: none;">@Tdual</a>
+        </p>
     </div>
 
     <div class="rooms-grid" id="rooms-grid">
@@ -276,7 +287,10 @@
                 const grid = document.getElementById('rooms-grid');
                 grid.innerHTML = '';
                 
-                data.rooms.forEach(room => {
+                // ルームを名前順（A, B, C, D）にソート
+                const sortedRooms = data.rooms.sort((a, b) => a.name.localeCompare(b.name));
+                
+                sortedRooms.forEach(room => {
                     rooms[room.id] = room;
                     const card = createRoomCard(room);
                     grid.appendChild(card);
