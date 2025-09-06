@@ -4,6 +4,7 @@ using JSON3
 using Dates
 
 include("ga_hybrid.jl")
+include("ga_population.jl")
 
 # CORSヘッダーを追加する関数
 function add_cors_headers(response::HTTP.Response)
@@ -105,6 +106,73 @@ end
     return add_cors_headers(response)
 end
 
+# 集団進化を実行
+@post "/api/test/evolve" function(req::HTTP.Request)
+    body = JSON3.read(String(req.body))
+    
+    # パラメータを取得（デフォルト値付き）
+    operator = get(body, :operator, "もっとホラー")
+    population_size = get(body, :population_size, 5)
+    generations = get(body, :generations, 3)
+    
+    # 進化を実行
+    result = evolve_with_diversity(String(operator), Int(population_size), Int(generations))
+    
+    # 各世代の最良個体のテキストを取得
+    generation_texts = []
+    for hist in result["history"]
+        # 各世代の全テキストから最初の3個体を取得
+        texts = hist["texts"][1:min(3, length(hist["texts"]))]
+        push!(generation_texts, Dict(
+            "generation" => hist["generation"],
+            "texts" => [length(t) > 200 ? first(t, 200) * "..." : t for t in texts],
+            "stats" => hist["stats"]
+        ))
+    end
+    
+    response = HTTP.Response(200, JSON3.write(Dict(
+        "operator" => operator,
+        "population_size" => population_size,
+        "generations" => generations,
+        "evolution" => generation_texts,
+        "final_best" => result["final_best"]
+    )))
+    return add_cors_headers(response)
+end
+
+# 並列進化を実行
+@post "/api/test/parallel" function(req::HTTP.Request)
+    body = JSON3.read(String(req.body))
+    
+    # パラメータを取得
+    operators = get(body, :operators, ["もっとホラー", "もっとロマンス", "もっとSF"])
+    population_size = get(body, :population_size, 4)
+    generations = get(body, :generations, 3)
+    
+    # 並列進化を実行
+    results = parallel_evolution(
+        [String(op) for op in operators],
+        Int(population_size),
+        Int(generations)
+    )
+    
+    # 結果を整形
+    formatted_results = Dict()
+    for (op, result) in results
+        formatted_results[op] = Dict(
+            "text" => length(result["best_text"]) > 500 ? 
+                     first(result["best_text"], 500) * "..." : result["best_text"],
+            "stats" => result["stats"]
+        )
+    end
+    
+    response = HTTP.Response(200, JSON3.write(Dict(
+        "operators" => operators,
+        "results" => formatted_results
+    )))
+    return add_cors_headers(response)
+end
+
 # 静的ファイルの提供（test.html）
 @get "/test" function(req::HTTP.Request)
     html_path = joinpath(dirname(@__FILE__), "..", "frontend", "test.html")
@@ -131,12 +199,27 @@ end
     end
 end
 
+@get "/evolution" function(req::HTTP.Request)
+    html_path = joinpath(dirname(@__FILE__), "..", "frontend", "evolution.html")
+    if isfile(html_path)
+        html_content = read(html_path, String)
+        response = HTTP.Response(200, html_content)
+        HTTP.setheader(response, "Content-Type" => "text/html; charset=utf-8")
+        return add_cors_headers(response)
+    else
+        return HTTP.Response(404, "Evolution page not found")
+    end
+end
+
 println("Starting test server on http://localhost:8081")
 println("Available endpoints:")
 println("  GET  /test            - Test page (UI)")
+println("  GET  /evolution       - Evolution Lab (集団進化)")
 println("  GET  /                - Test page (UI)")
 println("  GET  /api/test/initial - Get initial text")
 println("  POST /api/test/mutate  - Apply mutation")
+println("  POST /api/test/evolve  - Evolve population")
+println("  POST /api/test/parallel - Parallel evolution")
 println("  POST /api/test/reset   - Reset to initial state")
 println("  GET  /api/test/history - Get mutation history")
 

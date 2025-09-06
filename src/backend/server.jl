@@ -2,120 +2,205 @@ using Oxygen
 using HTTP
 using JSON3
 using Dates
-using UUIDs
 
-include("ga_engine.jl")
-include("database.jl")
-include("renderer.jl")
+include("room_manager.jl")
 
-const rooms = Dict{String, Room}()
-
-# CORS middleware
-function cors_middleware(handler)
-    return function(req::HTTP.Request)
-        response = handler(req)
-        
-        # CORSヘッダーを追加
-        HTTP.setheader(response, "Access-Control-Allow-Origin" => "*")
-        HTTP.setheader(response, "Access-Control-Allow-Methods" => "GET, POST, PUT, DELETE, OPTIONS")
-        HTTP.setheader(response, "Access-Control-Allow-Headers" => "Content-Type")
-        
-        return response
-    end
-end
-
-# OPTIONS リクエストの処理
-@options "/*" function(req::HTTP.Request)
-    response = HTTP.Response(204)
+# CORSヘッダーを追加する関数
+function add_cors_headers(response::HTTP.Response)
     HTTP.setheader(response, "Access-Control-Allow-Origin" => "*")
-    HTTP.setheader(response, "Access-Control-Allow-Methods" => "GET, POST, PUT, DELETE, OPTIONS")
+    HTTP.setheader(response, "Access-Control-Allow-Methods" => "GET, POST, OPTIONS")
     HTTP.setheader(response, "Access-Control-Allow-Headers" => "Content-Type")
     return response
 end
 
-@post "/api/rooms" function(req::HTTP.Request)
-    room_id = string(uuid4())
-    initial_text = "暗い森の奥で、少年は小さな光を見つけた。"
+# 全てのリクエストにCORSヘッダーを追加するミドルウェア
+function cors_middleware(handler)
+    return function(req::HTTP.Request)
+        # OPTIONSリクエストの処理
+        if req.method == "OPTIONS"
+            response = HTTP.Response(204)
+            return add_cors_headers(response)
+        end
+        
+        # 通常のリクエスト処理
+        response = handler(req)
+        return add_cors_headers(response)
+    end
+end
+
+# サーバー起動時にルームを初期化
+initialize_rooms()
+
+# ルーム一覧を取得
+@get "/api/rooms" function(req::HTTP.Request)
+    rooms_data = []
+    for room in get_all_rooms()
+        push!(rooms_data, Dict(
+            "id" => room.id,
+            "name" => room.name,
+            "generation" => room.generation,
+            "text_preview" => length(room.current_text) > 200 ? 
+                            first(room.current_text, 200) * "..." : room.current_text,
+            "updated_at" => string(room.updated_at)
+        ))
+    end
     
-    room = Room(
-        id = room_id,
-        current_genome = initialize_genome(),
-        current_text = initial_text,
-        generation = 0,
-        created_at = now(),
-        updated_at = now()
+    response = HTTP.Response(200, JSON3.write(Dict("rooms" => rooms_data)))
+    return add_cors_headers(response)
+end
+
+# 特定のルーム情報を取得
+@get "/api/rooms/{room_id}" function(req::HTTP.Request, room_id::String)
+    room = get_room(room_id)
+    if room === nothing
+        response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        return add_cors_headers(response)
+    end
+    
+    room_data = Dict(
+        "id" => room.id,
+        "name" => room.name,
+        "generation" => room.generation,
+        "text" => room.current_text,
+        "genome" => Dict(
+            "genre_weights" => room.current_genome.genre_weights,
+            "style_params" => room.current_genome.style_params,
+            "character_traits" => room.current_genome.character_traits,
+            "setting_elements" => room.current_genome.setting_elements
+        ),
+        "updated_at" => string(room.updated_at),
+        "recent_history" => length(room.nudge_history) > 10 ? 
+                           room.nudge_history[end-9:end] : room.nudge_history
     )
     
-    rooms[room_id] = room
-    save_room(room)
-    
-    return json(room)
+    response = HTTP.Response(200, JSON3.write(room_data))
+    return add_cors_headers(response)
 end
 
-@get "/api/rooms/{room_id}" function(req::HTTP.Request, room_id::String)
-    if !haskey(rooms, room_id)
-        room = load_room(room_id)
-        if isnothing(room)
-            return HTTP.Response(404, "Room not found")
-        end
-        rooms[room_id] = room
-    end
-    
-    return json(rooms[room_id])
-end
-
+# ルームにnudge操作を適用
 @post "/api/rooms/{room_id}/nudge" function(req::HTTP.Request, room_id::String)
-    if !haskey(rooms, room_id)
-        return HTTP.Response(404, "Room not found")
-    end
-    
     body = JSON3.read(String(req.body))
-    operator = body.operator
+    operator = get(body, :operator, "")
     actor = get(body, :actor, "anonymous")
     
-    room = rooms[room_id]
+    if operator == ""
+        response = HTTP.Response(400, JSON3.write(Dict("error" => "operator is required")))
+        return add_cors_headers(response)
+    end
     
-    new_genome = apply_mutation(room.current_genome, operator)
-    new_text = render_text(new_genome)
+    room = nudge_room(room_id, String(operator), String(actor))
+    if room === nothing
+        response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        return add_cors_headers(response)
+    end
     
-    room.current_genome = new_genome
-    room.current_text = new_text
-    room.generation += 1
-    room.updated_at = now()
-    
-    nudge = Nudge(
-        id = string(uuid4()),
-        room_id = room_id,
-        operator = operator,
-        actor = actor,
-        new_genome = new_genome,
-        created_at = now()
+    response_data = Dict(
+        "room_id" => room.id,
+        "generation" => room.generation,
+        "text" => room.current_text,
+        "operator" => operator,
+        "actor" => actor,
+        "genome" => Dict(
+            "genre_weights" => room.current_genome.genre_weights,
+            "style_params" => room.current_genome.style_params
+        )
     )
     
-    save_room(room)
-    save_nudge(nudge)
-    
-    broadcast_update(room_id, room)
-    
-    return json(Dict(
-        "room" => room,
-        "nudge" => nudge
-    ))
+    response = HTTP.Response(200, JSON3.write(response_data))
+    return add_cors_headers(response)
 end
 
-@get "/api/rooms/{room_id}/events" function(req::HTTP.Request, room_id::String)
-    response = HTTP.Response(200)
-    response.headers["Content-Type"] = "text/event-stream"
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["Connection"] = "keep-alive"
+# ルームのスナップショットを作成
+@post "/api/rooms/{room_id}/snapshot" function(req::HTTP.Request, room_id::String)
+    snapshot = create_snapshot(room_id)
+    if snapshot === nothing
+        response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        return add_cors_headers(response)
+    end
     
-    return response
+    response = HTTP.Response(200, JSON3.write(snapshot))
+    return add_cors_headers(response)
 end
 
-function broadcast_update(room_id::String, room::Room)
-    # SSE/WebSocket実装は後で追加
-    println("Broadcasting update for room $room_id")
+# ルームの統計情報を取得
+@get "/api/rooms/{room_id}/stats" function(req::HTTP.Request, room_id::String)
+    stats = get_room_stats(room_id)
+    if stats === nothing
+        response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        return add_cors_headers(response)
+    end
+    
+    response = HTTP.Response(200, JSON3.write(stats))
+    return add_cors_headers(response)
 end
 
-# Oxygenサーバーの設定とCORS対応
-serve(host="0.0.0.0", port=8080, middleware=[cors_middleware])
+# 全ルームの比較データを取得
+@get "/api/rooms/compare" function(req::HTTP.Request)
+    comparisons = compare_rooms()
+    response = HTTP.Response(200, JSON3.write(Dict("comparisons" => comparisons)))
+    return add_cors_headers(response)
+end
+
+# メインページのHTML
+@get "/" function(req::HTTP.Request)
+    html_path = joinpath(dirname(@__FILE__), "..", "frontend", "index.html")
+    if isfile(html_path)
+        html_content = read(html_path, String)
+        response = HTTP.Response(200, html_content)
+        HTTP.setheader(response, "Content-Type" => "text/html; charset=utf-8")
+        return add_cors_headers(response)
+    else
+        # HTMLファイルがない場合は簡易版を返す
+        html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>GA Novelist - 4 Rooms</title>
+            <meta charset="utf-8">
+        </head>
+        <body>
+            <h1>GA Novelist - 4 Rooms</h1>
+            <p>Frontend not found. API is running.</p>
+            <p>Available endpoints:</p>
+            <ul>
+                <li>GET /api/rooms - Get all rooms</li>
+                <li>GET /api/rooms/{id} - Get room details</li>
+                <li>POST /api/rooms/{id}/nudge - Apply mutation</li>
+                <li>POST /api/rooms/{id}/snapshot - Create snapshot</li>
+                <li>GET /api/rooms/{id}/stats - Get room stats</li>
+                <li>GET /api/rooms/compare - Compare all rooms</li>
+            </ul>
+        </body>
+        </html>
+        """
+        response = HTTP.Response(200, html_content)
+        HTTP.setheader(response, "Content-Type" => "text/html; charset=utf-8")
+        return add_cors_headers(response)
+    end
+end
+
+# ルームページのHTML
+@get "/room.html" function(req::HTTP.Request)
+    html_path = joinpath(dirname(@__FILE__), "..", "frontend", "room.html")
+    if isfile(html_path)
+        html_content = read(html_path, String)
+        response = HTTP.Response(200, html_content)
+        HTTP.setheader(response, "Content-Type" => "text/html; charset=utf-8")
+        return add_cors_headers(response)
+    else
+        response = HTTP.Response(404, "Room page not found")
+        return add_cors_headers(response)
+    end
+end
+
+println("Starting GA Novelist server on http://localhost:8082")
+println("Available endpoints:")
+println("  GET  /                      - Main page (4 rooms)")
+println("  GET  /room.html            - Individual room page")
+println("  GET  /api/rooms            - Get all rooms")
+println("  GET  /api/rooms/{id}       - Get room details")
+println("  POST /api/rooms/{id}/nudge - Apply mutation")
+println("  GET  /api/rooms/{id}/stats - Get room stats")
+println("  GET  /api/rooms/compare    - Compare all rooms")
+
+serve(host="0.0.0.0", port=8082, middleware=[cors_middleware])
