@@ -361,6 +361,21 @@
         let roomId = null;
         let currentRoom = null;
         let updateTimer = null;
+        
+        // オペレーター名の日本語変換マップ（共通）
+        const operatorLabels = {
+            'horror': 'もっとホラー',
+            'romance': 'もっとロマンス', 
+            'scifi': 'もっとSF',
+            'sf': 'もっとSF',
+            'comedy': 'もっとコメディ',
+            'poetic': 'もっと詩的に',
+            'speed': 'もっとスピード感',
+            'dialogue': 'もっとセリフを',
+            'characters': 'もっとキャラを増やす',
+            'setting': '舞台を変える',
+            'chaos': 'もっと混沌'
+        };
 
         // 操作ボタンの定義
         const operators = [
@@ -455,12 +470,15 @@
                 return;
             }
             
-            historyList.innerHTML = history.slice(-10).reverse().map(item => `
-                <div class="history-item">
-                    <span>世代${item.generation}: ${item.operator}</span>
-                    <span>${item.actor}</span>
-                </div>
-            `).join('');
+            
+            historyList.innerHTML = history.slice(-10).reverse().map(item => {
+                const operatorName = operatorLabels[item.operator] || item.operator;
+                return `
+                    <div class="history-item">
+                        <span>世代${item.generation}: ${operatorName}</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         // コントロールボタンを生成
@@ -510,7 +528,10 @@
                     currentRoom.generation = result.generation;
                 }
                 
-                showSuccess(`操作「${operator}」を適用しました`);
+                // 共通のoperatorLabelsを使用
+                const operatorName = operatorLabels[operator] || operator;
+                
+                showSuccess(`${operatorName}を適用しました`);
                 
                 // 500ms後に全体を再読み込み（より確実に）
                 setTimeout(() => {
