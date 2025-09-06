@@ -356,7 +356,7 @@
 
     <script>
         const API_BASE = 'http://localhost:8082/api';
-        const UPDATE_INTERVAL = 5000; // 5秒ごとに更新
+        const UPDATE_INTERVAL = 1000; // 1秒ごとに更新（デバッグ用）
         
         let roomId = null;
         let currentRoom = null;
@@ -387,7 +387,9 @@
             if (!roomId) return;
             
             try {
-                const response = await fetch(`${API_BASE}/rooms/${roomId}`);
+                // キャッシュバスターを追加
+                const cacheBuster = `?t=${Date.now()}`;
+                const response = await fetch(`${API_BASE}/rooms/${roomId}${cacheBuster}`);
                 if (!response.ok) throw new Error('Room not found');
                 
                 const room = await response.json();
@@ -424,7 +426,8 @@
             if (!roomId) return;
             
             try {
-                const response = await fetch(`${API_BASE}/rooms/${roomId}/stats`);
+                const cacheBuster = `?t=${Date.now()}`;
+                const response = await fetch(`${API_BASE}/rooms/${roomId}/stats${cacheBuster}`);
                 const stats = await response.json();
                 
                 document.getElementById('stat-nudges').textContent = stats.total_nudges || 0;
@@ -465,7 +468,7 @@
             const grid = document.getElementById('controls-grid');
             grid.innerHTML = operators.map(op => `
                 <button class="nudge-btn" 
-                        onclick="performNudge('${op.label}')"
+                        onclick="performNudge('${op.id}')"
                         style="background: linear-gradient(135deg, ${op.color}, ${op.color}dd)">
                     ${op.label}
                 </button>
@@ -477,6 +480,8 @@
             if (!roomId) return;
             
             try {
+                console.log('Nudge実行:', operator); // デバッグログ
+                
                 const response = await fetch(`${API_BASE}/rooms/${roomId}/nudge`, {
                     method: 'POST',
                     headers: {
@@ -491,16 +496,27 @@
                 if (!response.ok) throw new Error('Nudge failed');
                 
                 const result = await response.json();
+                console.log('Nudge結果:', result); // デバッグログ
                 
                 // UIを即座に更新
                 document.getElementById('text-display').textContent = result.text;
                 document.getElementById('room-generation').textContent = `第${result.generation}世代`;
                 document.getElementById('stat-generation').textContent = result.generation;
                 
-                showSuccess(`${operator} を適用しました`);
+                // currentRoomも更新
+                if (currentRoom) {
+                    currentRoom.text = result.text;
+                    currentRoom.current_text = result.text;
+                    currentRoom.generation = result.generation;
+                }
                 
-                // 全体を再読み込み
-                setTimeout(loadRoom, 1000);
+                showSuccess(`操作「${operator}」を適用しました`);
+                
+                // 500ms後に全体を再読み込み（より確実に）
+                setTimeout(() => {
+                    loadRoom();
+                    updateStats();
+                }, 500);
                 
             } catch (error) {
                 console.error('Nudgeエラー:', error);
