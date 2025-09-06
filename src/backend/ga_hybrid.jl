@@ -362,35 +362,198 @@ function mutate_characters(genome::TextGenome)
     return new_genome
 end
 
-# 舞台変更変換
+# 舞台要素の定義
+mutable struct StageElement
+    name::String
+    description::String
+    atmosphere::String
+    transitions::Vector{String}  # 進化可能な舞台
+end
+
+# 舞台進化の定義
+const STAGE_EVOLUTION = Dict(
+    "森" => StageElement("森", "自然豊かな森林", "静寂", ["暗い森", "魔法の森", "廃墟"]),
+    "暗い森" => StageElement("暗い森", "不気味な森", "恐怖", ["呪われた森", "廃墟", "洞窟"]),
+    "魔法の森" => StageElement("魔法の森", "神秘的な森", "幻想", ["妖精の国", "空中庭園", "水晶洞窟"]),
+    "廃墟" => StageElement("廃墟", "朽ち果てた建物", "荒廃", ["地下遺跡", "工場廃墟", "古城"]),
+    "洞窟" => StageElement("洞窟", "暗い地下空間", "神秘", ["水晶洞窟", "地下遺跡", "溶岩洞"]),
+    "古城" => StageElement("古城", "中世の城", "重厚", ["幽霊城", "空中城", "水中城"]),
+    "工場廃墟" => StageElement("工場廃墟", "産業遺跡", "機械的", ["宇宙ステーション", "サイバー空間", "未来都市"]),
+    "宇宙ステーション" => StageElement("宇宙ステーション", "宇宙の基地", "SF", ["異星基地", "時空間", "次元の狭間"]),
+    "妖精の国" => StageElement("妖精の国", "ファンタジー世界", "幻想", ["雲の上", "夢の世界", "鏡の世界"])
+)
+
+# 舞台変更の遺伝的アルゴリズム実装
 function mutate_setting(genome::TextGenome)
-    new_genome = deepcopy(genome)
-    new_genome.mutation_count += 1
+    # 複数の舞台変更候補を生成（集団）
+    population_size = 5
+    candidates = []
     
-    # 舞台を徐々に変更
-    setting_changes = [
-        ("森", "廃墟"),
-        ("小道", "通路"),
-        ("木々", "建物"),
-        ("落ち葉", "瓦礫")
-    ]
-    
-    for i in 1:length(new_genome.text_segments)
-        segment = new_genome.text_segments[i]
-        
-        # 30%の確率で置換
-        for (original, replacement) in setting_changes
-            if rand() < 0.3 && contains(segment, original)
-                segment = replace(segment, original => replacement, count=1)
-            end
-        end
-        
-        new_genome.text_segments[i] = segment
+    for _ in 1:population_size
+        candidate = deepcopy(genome)
+        candidate.mutation_count += 1
+        candidate = apply_stage_evolution(candidate)
+        push!(candidates, candidate)
     end
     
-    new_genome.setting_elements = ["廃墟", "都市"]
+    # 各候補の適応度を評価
+    fitnesses = [evaluate_stage_fitness(candidate, genome) for candidate in candidates]
+    
+    # トーナメント選択で最良候補を選択
+    best_idx = tournament_select_stage(fitnesses)
+    selected = candidates[best_idx]
+    
+    # 選択された候補に交叉と突然変異を適用
+    final_genome = apply_stage_crossover_mutation(selected, genome)
+    
+    return final_genome
+end
+
+# 舞台の進化を適用
+function apply_stage_evolution(genome::TextGenome)
+    new_genome = deepcopy(genome)
+    
+    # 現在の舞台要素を特定
+    current_stages = extract_current_stages(new_genome)
+    
+    for stage in current_stages
+        if haskey(STAGE_EVOLUTION, stage) && rand() < 0.4
+            evolution = STAGE_EVOLUTION[stage]
+            new_stage = rand(evolution.transitions)
+            
+            # テキスト内で舞台を進化
+            for i in 1:length(new_genome.text_segments)
+                segment = new_genome.text_segments[i]
+                if contains(segment, stage)
+                    # 進化した舞台に置換
+                    segment = replace(segment, stage => new_stage, count=1)
+                    # 雰囲気に応じた修飾を追加
+                    if haskey(STAGE_EVOLUTION, new_stage)
+                        new_evolution = STAGE_EVOLUTION[new_stage]
+                        if new_evolution.atmosphere == "恐怖"
+                            segment = add_horror_atmosphere(segment)
+                        elseif new_evolution.atmosphere == "幻想"
+                            segment = add_fantasy_atmosphere(segment)
+                        elseif new_evolution.atmosphere == "SF"
+                            segment = add_scifi_atmosphere(segment)
+                        end
+                    end
+                    new_genome.text_segments[i] = segment
+                end
+            end
+            
+            # 設定要素を更新
+            if new_stage ∉ new_genome.setting_elements
+                push!(new_genome.setting_elements, new_stage)
+            end
+        end
+    end
     
     return new_genome
+end
+
+# 現在のテキストから舞台要素を抽出
+function extract_current_stages(genome::TextGenome)
+    stages = []
+    full_text = join(genome.text_segments, " ")
+    
+    for stage_name in keys(STAGE_EVOLUTION)
+        if contains(full_text, stage_name)
+            push!(stages, stage_name)
+        end
+    end
+    
+    # デフォルト舞台
+    if isempty(stages)
+        push!(stages, "森")
+    end
+    
+    return unique(stages)
+end
+
+# 舞台変更の適応度評価
+function evaluate_stage_fitness(candidate::TextGenome, original::TextGenome)
+    fitness = 0.0
+    
+    # 舞台の多様性を評価
+    stage_count = length(candidate.setting_elements)
+    fitness += stage_count * 0.3
+    
+    # テキストの変化度を評価
+    original_text = join(original.text_segments, " ")
+    candidate_text = join(candidate.text_segments, " ")
+    
+    # 文字レベルでの差異
+    diff_ratio = 1.0 - (length(intersect(original_text, candidate_text)) / max(length(original_text), length(candidate_text)))
+    fitness += diff_ratio * 0.5
+    
+    # 舞台の雰囲気統一性を評価
+    atmospheres = []
+    for element in candidate.setting_elements
+        if haskey(STAGE_EVOLUTION, element)
+            push!(atmospheres, STAGE_EVOLUTION[element].atmosphere)
+        end
+    end
+    
+    # 統一感があるほど高い適応度
+    if length(unique(atmospheres)) <= 2
+        fitness += 0.2
+    end
+    
+    return fitness
+end
+
+# トーナメント選択
+function tournament_select_stage(fitnesses::Vector{Float64}, tournament_size::Int=3)
+    candidates = rand(1:length(fitnesses), tournament_size)
+    tournament_fitnesses = [fitnesses[i] for i in candidates]
+    best_local_idx = argmax(tournament_fitnesses)
+    return candidates[best_local_idx]
+end
+
+# 舞台要素の交叉と突然変異
+function apply_stage_crossover_mutation(selected::TextGenome, original::TextGenome)
+    result = deepcopy(selected)
+    
+    # 交叉: 元のゲノムの設定要素の一部を継承
+    if rand() < 0.3
+        inherited_elements = rand(original.setting_elements, min(2, length(original.setting_elements)))
+        for element in inherited_elements
+            if element ∉ result.setting_elements
+                push!(result.setting_elements, element)
+            end
+        end
+    end
+    
+    # 突然変異: 新しい舞台要素をランダム追加
+    if rand() < 0.2
+        all_stages = collect(keys(STAGE_EVOLUTION))
+        new_stage = rand(all_stages)
+        if new_stage ∉ result.setting_elements
+            push!(result.setting_elements, new_stage)
+        end
+    end
+    
+    return result
+end
+
+# 雰囲気修飾の追加関数
+function add_horror_atmosphere(text::String)
+    horror_modifiers = ["不気味な", "薄暗い", "ざわめく", "冷たい風が吹く"]
+    modifier = rand(horror_modifiers)
+    return modifier * text
+end
+
+function add_fantasy_atmosphere(text::String)
+    fantasy_modifiers = ["輝く", "神秘的な", "魔法に満ちた", "幻想的な"]
+    modifier = rand(fantasy_modifiers)
+    return modifier * text
+end
+
+function add_scifi_atmosphere(text::String)
+    scifi_modifiers = ["メタリックな", "電子的な", "未来的な", "人工的な"]
+    modifier = rand(scifi_modifiers)
+    return modifier * text
 end
 
 # 混沌変換
