@@ -61,8 +61,25 @@ function nudge_room(room_id::String, operator::String, actor::String="anonymous"
         return nothing
     end
     
+    # フロントエンドIDから日本語オペレーター名に変換
+    operator_mapping = Dict(
+        "horror" => "もっとホラー",
+        "romance" => "もっとロマンス", 
+        "scifi" => "もっとSF",
+        "comedy" => "もっとコメディ",
+        "poetic" => "もっと詩的に",
+        "speed" => "もっとスピード感",
+        "dialogue" => "もっとセリフを",
+        "characters" => "もっとキャラを増やす",
+        "setting" => "もっと舞台を変える",
+        "chaos" => "もっと混沌"
+    )
+    
+    # マッピングがあれば変換、なければそのまま
+    mapped_operator = get(operator_mapping, operator, operator)
+    
     # 突然変異を適用
-    new_genome = apply_mutation(room.current_genome, operator)
+    new_genome = apply_mutation(room.current_genome, mapped_operator)
     new_text = render_text(new_genome)
     
     # ルームを更新
