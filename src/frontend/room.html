@@ -161,6 +161,35 @@
             height: 200px;
         }
 
+        .cooldown-timer {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: none;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        .cooldown-timer.active {
+            display: block;
+        }
+        
+        .cooldown-timer .timer-value {
+            font-size: 24px;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.98); }
+        }
+        
         .stats-card {
             background: white;
             border-radius: 16px;
@@ -298,6 +327,53 @@
                 opacity: 1;
             }
         }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 300px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .loading-text {
+            font-size: 16px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -339,6 +415,12 @@
             </div>
         </div>
 
+        <div class="cooldown-timer" id="cooldown-timer">
+            <div>⏱️ クールダウン中</div>
+            <div class="timer-value" id="timer-value">60秒</div>
+            <div style="font-size: 14px; margin-top: 5px;">残り使用回数: <span id="remaining-clicks">3</span>回</div>
+        </div>
+        
         <div class="controls-card">
             <div class="controls-title">物語を進化させる</div>
             <div class="controls-grid" id="controls-grid">
@@ -362,39 +444,168 @@
         let currentRoom = null;
         let updateTimer = null;
         
+        // クリック制限機能
+        let clickCount = 0;
+        let lastResetTime = Date.now();
+        const MAX_CLICKS = 3;
+        const COOLDOWN_TIME = 60000; // 1分
+        const STORAGE_KEY = 'ga_novelist_click_limit';
+        
         // オペレーター名の日本語変換マップ（共通）
         const operatorLabels = {
             'horror': 'もっとホラー',
             'romance': 'もっとロマンス', 
             'scifi': 'もっとSF',
-            'sf': 'もっとSF',
             'comedy': 'もっとコメディ',
-            'poetic': 'もっと詩的に',
-            'speed': 'もっとスピード感',
-            'dialogue': 'もっとセリフを',
-            'characters': 'もっとキャラを増やす',
-            'setting': '舞台を変える',
-            'chaos': 'もっと混沌'
+            'neutral': 'ニュートラル'
         };
 
         // 操作ボタンの定義
         const operators = [
             { id: 'horror', label: 'もっとホラー', color: '#8B0000' },
             { id: 'romance', label: 'もっとロマンス', color: '#FF69B4' },
-            { id: 'sf', label: 'もっとSF', color: '#4169E1' },
+            { id: 'scifi', label: 'もっとSF', color: '#4169E1' },
             { id: 'comedy', label: 'もっとコメディ', color: '#FF8C00' },
-            { id: 'poetic', label: 'もっと詩的に', color: '#9370DB' },
-            { id: 'speed', label: 'もっとスピード感', color: '#DC143C' },
-            { id: 'dialogue', label: 'もっとセリフ', color: '#2E8B57' },
-            { id: 'characters', label: 'もっとキャラ', color: '#FF6347' },
-            { id: 'setting', label: '舞台を変える', color: '#4682B4' },
-            { id: 'chaos', label: 'もっと混沌', color: '#8B008B' }
+            { id: 'neutral', label: 'ニュートラル', color: '#708090' }
         ];
 
         // URLパラメータからルームIDを取得
         function getRoomIdFromUrl() {
             const params = new URLSearchParams(window.location.search);
             return params.get('id');
+        }
+        
+        // クリック制限状態をlocalStorageから読み込み
+        function loadClickLimitState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const now = Date.now();
+                    
+                    // 1分経過していればリセット
+                    if (now - data.lastResetTime >= COOLDOWN_TIME) {
+                        clickCount = 0;
+                        lastResetTime = now;
+                        saveClickLimitState();
+                    } else {
+                        clickCount = data.clickCount;
+                        lastResetTime = data.lastResetTime;
+                    }
+                }
+            } catch (e) {
+                console.log('クリック制限状態の読み込みエラー:', e);
+            }
+        }
+        
+        // クリック制限状態をlocalStorageに保存
+        function saveClickLimitState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    clickCount: clickCount,
+                    lastResetTime: lastResetTime
+                }));
+            } catch (e) {
+                console.log('クリック制限状態の保存エラー:', e);
+            }
+        }
+        
+        // クリック可能かチェック
+        function canClick() {
+            const now = Date.now();
+            
+            // 1分経過していればリセット
+            if (now - lastResetTime >= COOLDOWN_TIME) {
+                clickCount = 0;
+                lastResetTime = now;
+                saveClickLimitState();
+            }
+            
+            return clickCount < MAX_CLICKS;
+        }
+        
+        // 残り時間を取得
+        function getRemainingTime() {
+            const now = Date.now();
+            const elapsed = now - lastResetTime;
+            return Math.max(0, COOLDOWN_TIME - elapsed);
+        }
+        
+        // タイマー更新のインターバルID
+        let timerInterval = null;
+        
+        // ボタンの状態とタイマーを更新
+        function updateButtonStates() {
+            const buttons = document.querySelectorAll('.nudge-btn');
+            const canPerformClick = canClick();
+            const timerElement = document.getElementById('cooldown-timer');
+            const timerValueElement = document.getElementById('timer-value');
+            const remainingClicksElement = document.getElementById('remaining-clicks');
+            
+            // 残り回数を更新
+            const remainingClicks = MAX_CLICKS - clickCount;
+            if (remainingClicksElement) {
+                remainingClicksElement.textContent = remainingClicks;
+            }
+            
+            if (canPerformClick) {
+                // タイマーを非表示
+                if (timerElement) {
+                    timerElement.classList.remove('active');
+                }
+                // インターバルをクリア
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                
+                buttons.forEach(button => {
+                    button.disabled = false;
+                    button.style.opacity = '1';
+                    button.style.cursor = 'pointer';
+                    button.title = '';
+                });
+            } else {
+                // タイマーを表示
+                if (timerElement) {
+                    timerElement.classList.add('active');
+                }
+                
+                // タイマー更新処理
+                const updateTimer = () => {
+                    const remaining = getRemainingTime();
+                    const seconds = Math.ceil(remaining / 1000);
+                    if (timerValueElement) {
+                        timerValueElement.textContent = `${seconds}秒`;
+                    }
+                    
+                    // 時間が切れたらボタンを再有効化
+                    if (seconds <= 0) {
+                        clickCount = 0;
+                        lastResetTime = Date.now();
+                        saveClickLimitState();
+                        updateButtonStates();
+                    }
+                };
+                
+                // 初回更新
+                updateTimer();
+                
+                // インターバル設定（1秒ごと）
+                if (!timerInterval) {
+                    timerInterval = setInterval(updateTimer, 1000);
+                }
+                
+                buttons.forEach(button => {
+                    button.disabled = true;
+                    button.style.opacity = '0.5';
+                    button.style.cursor = 'not-allowed';
+                    
+                    const remaining = getRemainingTime();
+                    const seconds = Math.ceil(remaining / 1000);
+                    button.title = `あと${seconds}秒待ってください`;
+                });
+            }
         }
 
         // ルーム詳細を取得
@@ -497,6 +708,18 @@
         async function performNudge(operator) {
             if (!roomId) return;
             
+            // クリック制限チェック
+            if (!canClick()) {
+                const remaining = getRemainingTime();
+                const seconds = Math.ceil(remaining / 1000);
+                showError(`あと${seconds}秒待ってください。(残り${MAX_CLICKS - clickCount}回)`);
+                return;
+            }
+            
+            // ローディング表示
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.classList.add('active');
+
             try {
                 console.log('Nudge実行:', operator); // デバッグログ
                 
@@ -531,7 +754,17 @@
                 // 共通のoperatorLabelsを使用
                 const operatorName = operatorLabels[operator] || operator;
                 
-                showSuccess(`${operatorName}を適用しました`);
+                // クリックカウントを墜加
+                clickCount++;
+                saveClickLimitState();
+                updateButtonStates();
+                
+                const remainingClicks = MAX_CLICKS - clickCount;
+                if (remainingClicks > 0) {
+                    showSuccess(`${operatorName}を適用しました。(残り${remainingClicks}回)`);
+                } else {
+                    showSuccess(`${operatorName}を適用しました。次は1分後に使用可能です。`);
+                }
                 
                 // 500ms後に全体を再読み込み（より確実に）
                 setTimeout(() => {
@@ -542,6 +775,9 @@
             } catch (error) {
                 console.error('Nudgeエラー:', error);
                 showError('操作に失敗しました');
+            } finally {
+                // ローディング非表示
+                loadingOverlay.classList.remove('active');
             }
         }
 
@@ -592,7 +828,10 @@
 
         // 定期的に更新
         function startAutoUpdate() {
-            updateTimer = setInterval(loadRoom, UPDATE_INTERVAL);
+            updateTimer = setInterval(() => {
+                loadRoom();
+                updateButtonStates(); // ボタン状態も更新
+            }, UPDATE_INTERVAL);
         }
 
         // 初期化
@@ -604,8 +843,12 @@
                 return;
             }
             
+            // クリック制限状態を読み込み
+            loadClickLimitState();
+            
             createControls();
             loadRoom();
+            updateButtonStates();
             startAutoUpdate();
         });
 
@@ -616,5 +859,13 @@
             }
         });
     </script>
+
+    <!-- ローディングオーバーレイ -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">物語を進化させています...</div>
+        </div>
+    </div>
 </body>
 </html>

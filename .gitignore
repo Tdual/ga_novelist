@@ -49,3 +49,8 @@ CLAUDE.md
 # Temporary files
 tmp/
 temp/
+
+# Test and debug files
+test_*.py
+debug_*.html
+*_test.jl

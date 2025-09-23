@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>GA Novelist Debug</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .room {
+            background: white;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>GA Novelist Debug</h1>
+    <div id="status">Loading...</div>
+    <div id="rooms"></div>
+
+    <script>
+        async function debug() {
+            const statusDiv = document.getElementById('status');
+            const roomsDiv = document.getElementById('rooms');
+            
+            try {
+                // APIエンドポイントをテスト
+                statusDiv.innerHTML = 'Fetching /api/rooms...';
+                const response = await fetch('http://localhost:8082/api/rooms');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                statusDiv.innerHTML = `<span class="success">Success! Found ${data.rooms.length} rooms</span>`;
+                
+                // 各ルームを表示
+                roomsDiv.innerHTML = '<h2>Rooms:</h2>';
+                data.rooms.forEach((room, index) => {
+                    const roomDiv = document.createElement('div');
+                    roomDiv.className = 'room';
+                    roomDiv.innerHTML = `
+                        <strong>Room ${index + 1}:</strong><br>
+                        ID: ${room.id}<br>
+                        Name: ${room.name}<br>
+                        Generation: ${room.generation}<br>
+                        Text Preview: ${room.text_preview ? room.text_preview.substring(0, 100) + '...' : 'No text'}
+                    `;
+                    roomsDiv.appendChild(roomDiv);
+                });
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                console.error('Debug error:', error);
+            }
+        }
+        
+        // ページ読み込み時に実行
+        debug();
+    </script>
+</body>
+</html>

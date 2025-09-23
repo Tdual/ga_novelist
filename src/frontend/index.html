@@ -268,9 +268,6 @@
                         <span class="stat-value">${room.generation || 0}</span>
                         <span>世代</span>
                     </div>
-                    <div class="stat-item">
-                        <span>クリックして入室 →</span>
-                    </div>
                 </div>
                 <button class="enter-btn">入室する</button>
             `;
@@ -305,8 +302,8 @@
 
         // ルームに入室
         function enterRoom(roomId) {
-            // room.htmlに遷移（roomIdをURLパラメータとして渡す）
-            window.location.href = `/room.html?id=${roomId}`;
+            // /roomに遷移（roomIdをURLパラメータとして渡す）
+            window.location.href = `/room?id=${encodeURIComponent(roomId)}`;
         }
 
         // 定期的に更新

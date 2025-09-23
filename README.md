@@ -57,12 +57,12 @@ Pkg.add("Random")
 1. サーバーを起動
 ```bash
 cd src/backend
-julia test_server.jl
+julia server.jl
 ```
 
 2. ブラウザでアクセス
 ```
-http://localhost:8081/test
+http://localhost:8082
 ```
 
 3. ボタンをクリックして文章を進化させる
@@ -83,13 +83,16 @@ http://localhost:8081/test
 ga_novelist/
 ├── src/
 │   ├── backend/
-│   │   ├── test_server.jl    # HTTPサーバー
+│   │   ├── server.jl          # HTTPサーバー（4ルーム対応）
+│   │   ├── room_manager.jl    # ルーム管理システム
 │   │   ├── ga_hybrid.jl      # ハイブリッド遺伝的アルゴリズム
 │   │   ├── ga_corpus.jl      # コーパスベース実装
-│   │   ├── ga_test.jl        # 初期実装
+│   │   ├── ga_population.jl  # 集団進化実装
 │   │   └── corpus.jl         # コーパス管理
 │   └── frontend/
-│       └── test.html          # Webインターフェース
+│       ├── index.html         # メインページ（4ルーム）
+│       ├── room.html          # 個別ルームページ
+│       └── evolution.html     # 集団進化実験
 └── docs/
     └── algorithm.md           # アルゴリズム詳細説明
 ```
@@ -121,11 +124,13 @@ end
 
 ## API エンドポイント
 
-- `GET /test` - Webインターフェース
-- `GET /api/test/initial` - 初期テキスト取得
-- `POST /api/test/mutate` - 変異適用
-- `POST /api/test/reset` - 初期状態にリセット
-- `GET /api/test/history` - 変換履歴取得
+- `GET /` - メインページ（4ルーム）
+- `GET /room.html` - 個別ルームページ
+- `GET /api/rooms` - 全ルーム取得
+- `GET /api/rooms/{id}` - ルーム詳細
+- `POST /api/rooms/{id}/nudge` - 変異適用
+- `GET /api/rooms/{id}/stats` - 統計情報取得
+- `GET /api/rooms/compare` - 全ルーム比較
 
 ## 開発
 
