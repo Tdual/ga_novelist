@@ -599,12 +599,18 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // データ準備
-            const genres = ['horror', 'romance', 'scifi', 'comedy', 'neutral'];
+            const genres = ['horror', 'romance', 'scifi', 'comedy', 'poetic', 'tempo', 'dialogue', 'characters', 'setting', 'chaos', 'neutral'];
             const colors = {
                 horror: '#8B0000',
                 romance: '#FF69B4',
                 scifi: '#4169E1',
                 comedy: '#FF8C00',
+                poetic: '#9370DB',
+                tempo: '#FF4500',
+                dialogue: '#20B2AA',
+                characters: '#DAA520',
+                setting: '#2E8B57',
+                chaos: '#8B008B',
                 neutral: '#708090'
             };
             
@@ -850,6 +856,12 @@
                 { id: 'romance', label: 'ロマンス', color: '#FF69B4', value: genreWeights.romance || 0 },
                 { id: 'scifi', label: 'SF', color: '#4169E1', value: genreWeights.scifi || 0 },
                 { id: 'comedy', label: 'コメディ', color: '#FF8C00', value: genreWeights.comedy || 0 },
+                { id: 'poetic', label: '詩的', color: '#9370DB', value: genreWeights.poetic || 0 },
+                { id: 'tempo', label: 'スピード', color: '#FF4500', value: genreWeights.tempo || 0 },
+                { id: 'dialogue', label: '対話', color: '#20B2AA', value: genreWeights.dialogue || 0 },
+                { id: 'characters', label: 'キャラ', color: '#DAA520', value: genreWeights.characters || 0 },
+                { id: 'setting', label: '舞台', color: '#2E8B57', value: genreWeights.setting || 0 },
+                { id: 'chaos', label: '混沌', color: '#8B008B', value: genreWeights.chaos || 0 },
                 { id: 'neutral', label: 'ニュートラル', color: '#708090', value: genreWeights.neutral || 0 }
             ];
             
