@@ -55,3 +55,7 @@ test_*.py
 debug_*.html
 *_test.jl
 test_*.jl
+
+# Database configuration with credentials
+src/backend/db_config.jl
+database/rds_connection_info.json
