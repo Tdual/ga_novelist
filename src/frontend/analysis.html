@@ -727,12 +727,12 @@
                 }
                 
                 // 最終更新からの経過時間
-                if (stats.minutes_since_last_activity >= 0) {
-                    const minutes = stats.minutes_since_last_activity;
+                if (stats.minutes_since_last_activity !== undefined) {
+                    const minutes = Math.abs(stats.minutes_since_last_activity); // 負の値対策
                     if (minutes < 1) {
                         document.getElementById('avg-interval').textContent = `たった今`;
                     } else if (minutes < 60) {
-                        document.getElementById('avg-interval').textContent = `${minutes}分前`;
+                        document.getElementById('avg-interval').textContent = `${Math.floor(minutes)}分前`;
                     } else if (minutes < 1440) {
                         document.getElementById('avg-interval').textContent = `${Math.floor(minutes / 60)}時間前`;
                     } else {
