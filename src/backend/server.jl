@@ -72,16 +72,20 @@ end
             "GA Novelist"
         end
         
+        # データベースはUTCで保存されているため、そのまま使用
+        # フロントエンドでローカルタイムゾーンに変換される
+
         push!(rooms_data, Dict(
             "id" => row[2],  # nameをidとして使用
             "name" => row[2],
             "generation" => row[3],
             "text_preview" => length(text) > 200 ? first(text, 200) * "..." : text,
-            "updated_at" => string(row[4])
+            "updated_at" => string(DateTime(row[4]))
         ))
     end
     
     response = HTTP.Response(200, JSON3.write(Dict("rooms" => rooms_data)))
+    HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
     return add_cors_headers(response)
 end
 
@@ -93,6 +97,7 @@ end
     result = LibPQ.execute(conn, "SELECT id FROM rooms WHERE name = \$1", [room_id])
     if isempty(result)
         response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
         return add_cors_headers(response)
     end
     
@@ -121,6 +126,7 @@ end
     end
     
     response = HTTP.Response(200, JSON3.write(Dict("generations" => generations_data)))
+    HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
     return add_cors_headers(response)
 end
 
@@ -130,6 +136,7 @@ end
     
     if room === nothing
         response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
         return add_cors_headers(response)
     end
     
@@ -175,6 +182,7 @@ end
     )
     
     response = HTTP.Response(200, JSON3.write(room_data))
+    HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
     return add_cors_headers(response)
 end
 
@@ -189,6 +197,7 @@ end
         room = load_room(room_id)
         if room === nothing
             response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+            HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
             return add_cors_headers(response)
         end
         
@@ -228,13 +237,16 @@ end
             )
             
             response = HTTP.Response(200, JSON3.write(response_data))
+            HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
         else
             response = HTTP.Response(400, JSON3.write(Dict("error" => "Invalid operator: $operator")))
+            HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
         end
-        
+
         return add_cors_headers(response)
     catch e
         response = HTTP.Response(500, JSON3.write(Dict("error" => string(e))))
+        HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
         return add_cors_headers(response)
     end
 end
@@ -247,6 +259,7 @@ end
     result = LibPQ.execute(conn, "SELECT id FROM rooms WHERE name = \$1", [room_id])
     if isempty(result)
         response = HTTP.Response(404, JSON3.write(Dict("error" => "Room not found")))
+        HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
         return add_cors_headers(response)
     end
     
@@ -283,10 +296,12 @@ end
     
     minutes_since_last = if !isempty(last_update_result)
         updated_at = DateTime(last_update_result[1,1])
-        # 絶対値を取って正の値にする
-        abs(round(Int, (now() - updated_at).value / (1000 * 60)))
+        # RDSはUTCなので、9時間を加算してJSTに変換
+        updated_at_jst = updated_at + Hour(9)
+        # 現在時刻から過去の時刻を引いて経過時間を取得
+        round(Int, (Dates.now() - updated_at_jst).value / (1000 * 60))
     else
-        -1
+        0
     end
     
     stats_data = Dict(
@@ -297,6 +312,7 @@ end
     )
     
     response = HTTP.Response(200, JSON3.write(stats_data))
+    HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
     return add_cors_headers(response)
 end
 
@@ -322,6 +338,7 @@ end
         "database" => db_status,
         "timestamp" => string(now())
     )))
+    HTTP.setheader(response, "Content-Type" => "application/json; charset=utf-8")
     return add_cors_headers(response)
 end
 
