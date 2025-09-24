@@ -50,6 +50,8 @@ Pkg.add("HTTP")
 Pkg.add("JSON3")
 Pkg.add("Dates")
 Pkg.add("Random")
+Pkg.add("LibPQ")
+Pkg.add("UUIDs")
 ```
 
 ## 使い方
@@ -83,11 +85,10 @@ http://localhost:8082
 ga_novelist/
 ├── src/
 │   ├── backend/
-│   │   ├── server.jl          # HTTPサーバー（4ルーム対応）
-│   │   ├── room_manager.jl    # ルーム管理システム
-│   │   ├── ga_hybrid.jl      # ハイブリッド遺伝的アルゴリズム
-│   │   ├── ga_corpus.jl      # コーパスベース実装
-│   │   ├── ga_population.jl  # 集団進化実装
+│   │   ├── server.jl          # HTTPサーバー（RDS PostgreSQL使用）
+│   │   ├── database_postgres.jl # データベース接続管理
+│   │   ├── ga_corpus_postgres.jl # PostgreSQL対応GA実装
+│   │   ├── db_config.jl      # DB設定
 │   │   └── corpus.jl         # コーパス管理
 │   └── frontend/
 │       ├── index.html         # メインページ（4ルーム）

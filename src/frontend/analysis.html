@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GA Novelist - 世代分析</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .back-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: #5a67d8;
+            transform: translateX(-3px);
+        }
+
+        .room-title {
+            font-size: 32px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .generation-badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .analysis-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .analysis-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ジャンル進化グラフ */
+        .genre-chart {
+            height: 300px;
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .pie-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+
+        .pie-chart {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            position: relative;
+            transform: rotate(-90deg);
+        }
+
+        .pie-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        .legend-text {
+            color: #333;
+        }
+
+        .legend-value {
+            color: #666;
+            font-weight: bold;
+            margin-left: auto;
+        }
+
+        /* 統計テーブル */
+        .stats-table {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-key {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: bold;
+        }
+
+        /* 世代比較 */
+        .comparison-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .gen-select {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .compare-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .compare-button:hover {
+            background: #5a67d8;
+        }
+
+        .comparison-result {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 150px;
+        }
+
+        .diff-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .diff-item:last-child {
+            border-bottom: none;
+        }
+
+        .diff-label {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .diff-value {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .diff-before {
+            background: #ffebee;
+            color: #c62828;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .diff-after {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* 履歴タイムライン */
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e0e0e0;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -30px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .timeline-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .timeline-generation {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .timeline-operator {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .timeline-time {
+            color: #999;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        /* ローディング */
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* エラー表示 */
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-title">
+                <button class="back-btn" onclick="goBack()">← 戻る</button>
+                <h1 class="room-title" id="room-title">Loading...</h1>
+                <span class="generation-badge" id="generation-badge">第0世代</span>
+            </div>
+        </div>
+
+        <div class="analysis-grid">
+            <!-- ジャンル進化グラフ -->
+            <div class="analysis-card">
+                <h2 class="card-title">
+                    📊 ジャンル構成
+                </h2>
+                <!-- 世代選択スライダー -->
+                <div style="margin-bottom: 20px;">
+                    <label for="generationSlider" style="display: block; margin-bottom: 10px; color: #666;">
+                        世代: <span id="generationLabel" style="font-weight: bold;">現在</span>
+                    </label>
+                    <input type="range" id="generationSlider" min="0" max="10" value="10" 
+                           style="width: 100%;" onchange="updateGenerationView(this.value)">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; color: #999;">
+                        <span>初期</span>
+                        <span id="maxGenLabel">第10世代</span>
+                    </div>
+                </div>
+                <div class="genre-chart">
+                    <div class="pie-container">
+                        <canvas id="pieChart" class="pie-chart" width="200" height="200"></canvas>
+                    </div>
+                    <div class="pie-legend" id="pieLegend">
+                        <!-- 動的に生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 世代統計 -->
+            <div class="analysis-card">
+                <h2 class="card-title">
+                    📈 世代統計
+                </h2>
+                <div class="stats-table">
+                    <div class="stat-row">
+                        <span class="stat-key">総変更回数:</span>
+                        <span class="stat-value" id="total-nudges">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">最頻操作:</span>
+                        <span class="stat-value" id="most-used">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">平均変更間隔:</span>
+                        <span class="stat-value" id="avg-interval">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">進化速度:</span>
+                        <span class="stat-value" id="evolution-speed">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">最終更新:</span>
+                        <span class="stat-value" id="last-update">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ジャンル進化時系列 -->
+            <div class="analysis-card full-width">
+                <h2 class="card-title">
+                    📈 ジャンル進化の時系列
+                </h2>
+                <div style="position: relative; height: 300px; background: #f8f9fa; border-radius: 8px; padding: 20px;">
+                    <canvas id="timelineChart" width="800" height="260"></canvas>
+                </div>
+            </div>
+
+            <!-- 世代間比較 -->
+            <div class="analysis-card full-width">
+                <h2 class="card-title">
+                    🔄 世代間比較
+                </h2>
+                <div class="comparison-controls">
+                    <select id="gen-from" class="gen-select">
+                        <option value="0">初期状態</option>
+                    </select>
+                    <span>→</span>
+                    <select id="gen-to" class="gen-select">
+                        <option value="current">現在</option>
+                    </select>
+                    <button class="compare-button" onclick="compareGenerations()">比較する</button>
+                </div>
+                <div class="comparison-result" id="comparison-result">
+                    <div style="text-align: center; color: #999;">
+                        世代を選択して比較ボタンをクリックしてください
+                    </div>
+                </div>
+            </div>
+
+            <!-- 変更履歴タイムライン -->
+            <div class="analysis-card full-width">
+                <h2 class="card-title">
+                    📜 変更履歴タイムライン
+                </h2>
+                <div class="timeline" id="timeline">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>読み込み中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8082/api';
+        let roomId = null;
+        let currentRoom = null;
+        let roomHistory = [];
+        let generationHistory = [];  // 世代履歴データ
+
+        // ページ初期化
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            roomId = params.get('id');
+            
+            if (!roomId) {
+                document.getElementById('room-title').textContent = 'ルームが指定されていません';
+                return;
+            }
+            
+            document.getElementById('room-title').textContent = roomId;
+            
+            // データ取得
+            await loadRoomData();
+            await loadRoomStats();
+            await loadHistory();
+            await loadGenerationHistory();  // 世代履歴を取得
+            
+            // 世代選択肢を更新
+            updateGenerationOptions();
+        }
+
+        // 世代履歴を取得
+        async function loadGenerationHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/rooms/${roomId}/generations`);
+                if (!response.ok) throw new Error('Failed to load generation history');
+                
+                const data = await response.json();
+                generationHistory = data.generations || [];
+                
+                // スライダーの最大値を設定
+                if (currentRoom) {
+                    const slider = document.getElementById('generationSlider');
+                    slider.max = currentRoom.generation;
+                    slider.value = currentRoom.generation;
+                    document.getElementById('maxGenLabel').textContent = `第${currentRoom.generation}世代`;
+                }
+                
+                // 時系列グラフを描画
+                drawTimelineChart();
+                
+            } catch (error) {
+                console.error('Error loading generation history:', error);
+            }
+        }
+
+        // 世代ビューを更新
+        function updateGenerationView(generation) {
+            const genNum = parseInt(generation);
+            
+            // ラベル更新
+            document.getElementById('generationLabel').textContent = 
+                genNum === currentRoom?.generation ? '現在' : `第${genNum}世代`;
+            
+            // その世代のデータを探す
+            let genomeData = null;
+            
+            if (genNum === 0) {
+                // 初期状態
+                genomeData = {
+                    horror: 0.2,
+                    romance: 0.2,
+                    scifi: 0.2,
+                    comedy: 0.2,
+                    neutral: 0.2
+                };
+            } else if (genNum === currentRoom?.generation && currentRoom?.genome) {
+                // 現在の世代
+                genomeData = currentRoom.genome.genre_weights;
+            } else {
+                // 履歴から探す
+                const historyItem = generationHistory.find(g => g.generation === genNum);
+                if (historyItem) {
+                    genomeData = historyItem.genre_weights;
+                }
+            }
+            
+            // 円グラフ更新
+            if (genomeData) {
+                updateGenreChart(genomeData);
+            }
+        }
+
+        // 時系列グラフを描画
+        function drawTimelineChart() {
+            const canvas = document.getElementById('timelineChart');
+            const ctx = canvas.getContext('2d');
+            
+            // キャンバスクリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // データ準備
+            const genres = ['horror', 'romance', 'scifi', 'comedy', 'neutral'];
+            const colors = {
+                horror: '#8B0000',
+                romance: '#FF69B4',
+                scifi: '#4169E1',
+                comedy: '#FF8C00',
+                neutral: '#708090'
+            };
+            
+            // 初期世代を追加
+            const allData = [
+                {
+                    generation: 0,
+                    genre_weights: {
+                        horror: 0.2,
+                        romance: 0.2,
+                        scifi: 0.2,
+                        comedy: 0.2,
+                        neutral: 0.2
+                    }
+                },
+                ...generationHistory
+            ];
+            
+            // 現在の世代も追加
+            if (currentRoom && currentRoom.genome) {
+                const lastGen = allData[allData.length - 1];
+                if (!lastGen || lastGen.generation !== currentRoom.generation) {
+                    allData.push({
+                        generation: currentRoom.generation,
+                        genre_weights: currentRoom.genome.genre_weights
+                    });
+                }
+            }
+            
+            if (allData.length === 0) return;
+            
+            // グラフの設定
+            const padding = 40;
+            const graphWidth = canvas.width - padding * 2;
+            const graphHeight = canvas.height - padding * 2;
+            const maxGeneration = Math.max(...allData.map(d => d.generation));
+            
+            // 軸を描画
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+            
+            // 各ジャンルの線を描画
+            genres.forEach(genre => {
+                ctx.strokeStyle = colors[genre];
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                allData.forEach((data, index) => {
+                    const x = padding + (data.generation / maxGeneration) * graphWidth;
+                    const y = canvas.height - padding - ((data.genre_weights[genre] || 0) * graphHeight);
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    // データポイント
+                    ctx.fillStyle = colors[genre];
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+                
+                ctx.stroke();
+            });
+            
+            // 凡例
+            let legendX = canvas.width - 150;
+            let legendY = 20;
+            
+            genres.forEach((genre, index) => {
+                const labels = {
+                    horror: 'ホラー',
+                    romance: 'ロマンス',
+                    scifi: 'SF',
+                    comedy: 'コメディ',
+                    neutral: 'ニュートラル'
+                };
+                
+                ctx.fillStyle = colors[genre];
+                ctx.fillRect(legendX, legendY + index * 20, 15, 15);
+                
+                ctx.fillStyle = '#333';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(labels[genre], legendX + 20, legendY + index * 20 + 12);
+            });
+            
+            // 軸ラベル
+            ctx.fillStyle = '#666';
+            ctx.font = '11px sans-serif';
+            ctx.fillText('0', padding - 5, canvas.height - padding + 15);
+            ctx.fillText(maxGeneration.toString(), canvas.width - padding - 5, canvas.height - padding + 15);
+            ctx.fillText('世代', canvas.width / 2 - 10, canvas.height - 10);
+            
+            // Y軸ラベル
+            ctx.save();
+            ctx.translate(15, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('割合', -10, 0);
+            ctx.restore();
+        }
+
+        // ルームデータ取得
+        async function loadRoomData() {
+            try {
+                const response = await fetch(`${API_BASE}/rooms/${roomId}`);
+                if (!response.ok) throw new Error('Failed to load room');
+                
+                currentRoom = await response.json();
+                
+                // 世代バッジ更新
+                document.getElementById('generation-badge').textContent = `第${currentRoom.generation}世代`;
+                
+                // ジャンルグラフ更新
+                if (currentRoom.genome) {
+                    updateGenreChart(currentRoom.genome.genre_weights);
+                }
+                
+                // 履歴保存
+                roomHistory = currentRoom.recent_history || [];
+                
+            } catch (error) {
+                console.error('Error loading room:', error);
+                showError('ルームデータの取得に失敗しました');
+            }
+        }
+
+        // 統計情報取得
+        async function loadRoomStats() {
+            try {
+                const response = await fetch(`${API_BASE}/rooms/${roomId}/stats`);
+                if (!response.ok) throw new Error('Failed to load stats');
+                
+                const stats = await response.json();
+                
+                // 統計更新
+                document.getElementById('total-nudges').textContent = stats.total_nudges || 0;
+                
+                // 最頻操作
+                if (stats.most_used_operators) {
+                    const operators = Object.entries(stats.most_used_operators);
+                    if (operators.length > 0) {
+                        operators.sort((a, b) => b[1] - a[1]);
+                        const mostUsed = operators[0][0];
+                        const operatorLabels = {
+                            'horror': 'ホラー',
+                            'romance': 'ロマンス',
+                            'scifi': 'SF',
+                            'comedy': 'コメディ',
+                            'neutral': 'ニュートラル'
+                        };
+                        document.getElementById('most-used').textContent = 
+                            `${operatorLabels[mostUsed] || mostUsed} (${operators[0][1]}回)`;
+                    }
+                }
+                
+                // 最終更新からの経過時間
+                if (stats.minutes_since_last_activity >= 0) {
+                    const minutes = stats.minutes_since_last_activity;
+                    if (minutes < 1) {
+                        document.getElementById('avg-interval').textContent = `たった今`;
+                    } else if (minutes < 60) {
+                        document.getElementById('avg-interval').textContent = `${minutes}分前`;
+                    } else if (minutes < 1440) {
+                        document.getElementById('avg-interval').textContent = `${Math.floor(minutes / 60)}時間前`;
+                    } else {
+                        document.getElementById('avg-interval').textContent = `${Math.floor(minutes / 1440)}日前`;
+                    }
+                }
+                
+                // 進化速度
+                if (currentRoom && stats.total_nudges > 0) {
+                    const speed = (currentRoom.generation / stats.total_nudges * 100).toFixed(1);
+                    document.getElementById('evolution-speed').textContent = `${speed}%`;
+                }
+                
+                // 最終更新
+                if (currentRoom && currentRoom.updated_at) {
+                    const date = new Date(currentRoom.updated_at);
+                    document.getElementById('last-update').textContent = 
+                        date.toLocaleString('ja-JP', { 
+                            month: 'numeric', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                }
+                
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // 履歴タイムライン表示
+        async function loadHistory() {
+            const timeline = document.getElementById('timeline');
+            
+            if (!roomHistory || roomHistory.length === 0) {
+                timeline.innerHTML = '<div style="text-align: center; color: #999;">履歴がありません</div>';
+                return;
+            }
+            
+            timeline.innerHTML = roomHistory.map(item => {
+                const operatorLabels = {
+                    'horror': 'ホラー',
+                    'romance': 'ロマンス',
+                    'scifi': 'SF',
+                    'comedy': 'コメディ',
+                    'neutral': 'ニュートラル'
+                };
+                
+                const time = new Date(item.timestamp);
+                
+                return `
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-generation">世代 ${item.generation}</div>
+                            <div class="timeline-operator">${operatorLabels[item.operator] || item.operator}に変更</div>
+                            <div class="timeline-time">${time.toLocaleString('ja-JP')}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ジャンルグラフ更新（円グラフ）
+        function updateGenreChart(genreWeights) {
+            if (!genreWeights) return;
+            
+            const canvas = document.getElementById('pieChart');
+            const ctx = canvas.getContext('2d');
+            const legendDiv = document.getElementById('pieLegend');
+            
+            // データ準備
+            const genreData = [
+                { id: 'horror', label: 'ホラー', color: '#8B0000', value: genreWeights.horror || 0 },
+                { id: 'romance', label: 'ロマンス', color: '#FF69B4', value: genreWeights.romance || 0 },
+                { id: 'scifi', label: 'SF', color: '#4169E1', value: genreWeights.scifi || 0 },
+                { id: 'comedy', label: 'コメディ', color: '#FF8C00', value: genreWeights.comedy || 0 },
+                { id: 'neutral', label: 'ニュートラル', color: '#708090', value: genreWeights.neutral || 0 }
+            ];
+            
+            // キャンバスクリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 円グラフ描画
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 80;
+            
+            let currentAngle = -Math.PI / 2; // 12時の位置から開始
+            
+            genreData.forEach(genre => {
+                const sliceAngle = genre.value * 2 * Math.PI;
+                
+                // セクター描画
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = genre.color;
+                ctx.fill();
+                
+                // 境界線
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                currentAngle += sliceAngle;
+            });
+            
+            // 中心の白い円（ドーナツグラフ風）
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius * 0.4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            
+            // レジェンド更新
+            legendDiv.innerHTML = genreData.map(genre => {
+                const percentage = Math.round(genre.value * 100);
+                return `
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: ${genre.color};"></span>
+                        <span class="legend-text">${genre.label}</span>
+                        <span class="legend-value">${percentage}%</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 世代選択肢更新
+        function updateGenerationOptions() {
+            if (!currentRoom) return;
+            
+            const fromSelect = document.getElementById('gen-from');
+            const toSelect = document.getElementById('gen-to');
+            
+            // 既存のオプションをクリア（初期状態と現在は残す）
+            fromSelect.innerHTML = '<option value="0">初期状態</option>';
+            toSelect.innerHTML = '<option value="0">初期状態</option>';
+            
+            // 世代オプション追加
+            for (let i = 1; i <= currentRoom.generation; i++) {
+                fromSelect.innerHTML += `<option value="${i}">第${i}世代</option>`;
+                toSelect.innerHTML += `<option value="${i}">第${i}世代</option>`;
+            }
+            
+            // デフォルトは現在を選択
+            toSelect.innerHTML += `<option value="current" selected>現在（第${currentRoom.generation}世代）</option>`;
+        }
+
+        // 世代間比較
+        async function compareGenerations() {
+            const fromGen = document.getElementById('gen-from').value;
+            const toGen = document.getElementById('gen-to').value;
+            const resultDiv = document.getElementById('comparison-result');
+            
+            // 簡易的な比較実装（実際のデータ取得はAPIが必要）
+            const fromGenNum = fromGen === 'current' ? currentRoom.generation : parseInt(fromGen);
+            const toGenNum = toGen === 'current' ? currentRoom.generation : parseInt(toGen);
+            
+            if (fromGenNum === toGenNum) {
+                resultDiv.innerHTML = '<div style="text-align: center; color: #999;">同じ世代です</div>';
+                return;
+            }
+            
+            // 世代差計算
+            const genDiff = toGenNum - fromGenNum;
+            
+            // 変更履歴から該当期間の操作を抽出
+            const relevantHistory = roomHistory.filter(item => {
+                return item.generation > fromGenNum && item.generation <= toGenNum;
+            });
+            
+            // 操作統計
+            const operatorCount = {};
+            relevantHistory.forEach(item => {
+                operatorCount[item.operator] = (operatorCount[item.operator] || 0) + 1;
+            });
+            
+            const operatorLabels = {
+                'horror': 'ホラー',
+                'romance': 'ロマンス',
+                'scifi': 'SF',
+                'comedy': 'コメディ',
+                'neutral': 'ニュートラル'
+            };
+            
+            resultDiv.innerHTML = `
+                <div class="diff-item">
+                    <div class="diff-label">世代差</div>
+                    <div class="diff-value">
+                        <span class="diff-before">第${fromGenNum}世代</span>
+                        <span>→</span>
+                        <span class="diff-after">第${toGenNum}世代（+${genDiff}世代）</span>
+                    </div>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-label">変更回数</div>
+                    <div class="diff-value">
+                        <span>${relevantHistory.length}回の変更</span>
+                    </div>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-label">主な変更内容</div>
+                    <div class="diff-value" style="flex-direction: column; align-items: flex-start;">
+                        ${Object.entries(operatorCount).map(([op, count]) => 
+                            `<span style="margin: 2px 0;">${operatorLabels[op] || op}: ${count}回</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.querySelector('.container').prepend(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        // 戻るボタン
+        function goBack() {
+            window.location.href = `/room?id=${roomId}`;
+        }
+
+        // 初期化実行
+        init();
+    </script>
+</body>
+</html>
